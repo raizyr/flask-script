@@ -146,6 +146,13 @@ class Manager(object):
 
         If your sub-Manager does not override this, any values for options will get lost.
         """
+        # If we have a parent, we are a sub-manager
+        if self.parent and self.app:
+            # call our own app and use the result if it's not None
+            res = self.app(app=app, **kwargs)
+            if res != None:
+                app = res
+
         if app is None:
             app = self.app
             if app is None:
