@@ -165,14 +165,19 @@ class EmptyContext(object):
         pass
 
 class AppForTesting(object):
+    name = "APP"
     def __init__(self, verbose=False):
         self.verbose = verbose
     def test_request_context(self):
         return EmptyContext()
     def __call__(self,**kw):
         if self.verbose:
-            print("APP "+" ".join("%s=%s" % (k,v) for k,v in kw.items()))
+            print("{} {}".format(self.name,
+                                 " ".join("%s=%s" % (k,v) for k,v in kw.items())))
         return self
+
+class SubAppForTesting(AppForTesting):
+    name = "SUB"
 
 
 class TestManager:
@@ -803,6 +808,25 @@ class TestSubManager:
         assert 'APP name_main=MyMainName' in out
         assert 'APP name_sub=MySubName' in out
         assert 'OK name=MyName' in out
+
+    def test_submanager_overrides_app(self, capsys):
+        def gen_app(app, **kwargs):
+            return SubAppForTesting(verbose=True)
+        sub_manager = Manager(gen_app, with_default_commands=False)
+        sub_manager.add_command('opt', CommandWithOptionalArg())
+        sub_manager.add_option('-n', '--name', dest='name_sub', required=False)
+
+        manager = Manager(AppForTesting(verbose=True), with_default_commands=False)
+        manager.add_command('sub_manager', sub_manager)
+        manager.add_option('-n', '--name', dest='name_main', required=False)
+
+        code = run('manage.py -n MyMainName sub_manager -n MySubName opt -n MyName', manager.run)
+        out, err = capsys.readouterr()
+        assert code == 0
+        assert 'APP name_main=MyMainName' in out
+        assert 'SUB name_sub=MySubName' in out
+        assert 'OK name=MyName' in out
+
 
     def test_manager_usage_with_submanager(self, capsys):
 
